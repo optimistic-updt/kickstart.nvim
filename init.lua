@@ -580,7 +580,6 @@ require('lazy').setup({
       local servers = {
         -- clangd = {},
         -- gopls = {},
-        pyright = {},
         -- rust_analyzer = {},
         --
         -- Some languages (like typescript) have entire language plugins that can be useful:
@@ -601,6 +600,7 @@ require('lazy').setup({
       vim.list_extend(ensure_installed, {
         'lua_ls', -- Lua Language server
         'stylua', -- Used to format Lua code
+        'ty', -- Astral's Python type checker / language server
         -- You can add other tools here that you want Mason to install
       })
 
@@ -638,6 +638,47 @@ require('lazy').setup({
         },
       })
       vim.lsp.enable 'lua_ls'
+
+      -- ty: Astral's Python type checker / language server (installed via Mason above).
+      -- Reference: https://docs.astral.sh/ty/editors/#neovim
+      --
+      -- Optional: Only required if you need to update the language server settings
+      vim.lsp.config('ty', {
+        capabilities = capabilities,
+        settings = {
+          ty = {
+            -- ty language server settings go here
+          },
+        },
+      })
+
+      -- Required: Enable the language server
+      vim.lsp.enable 'ty'
+
+      -- Ruby LSP (Shopify) — Ruby/Rails language server.
+      -- Reference: https://shopify.github.io/ruby-lsp/editors.html
+      --
+      -- Deliberately NOT in the Mason `servers` table above: Shopify warns that
+      -- Mason-managed ruby-lsp breaks, because its C-extensions are compiled
+      -- against whichever Ruby was active at install time. Instead the gem is
+      -- installed into the mise-managed Ruby (see dotfiles/.macos):
+      --    gem install ruby-lsp
+      -- The `ruby-lsp` executable then resolves through mise's shims, so it
+      -- always matches the project's Ruby version.
+      --
+      -- Rails support is automatic: ruby-lsp detects a Rails app and pulls the
+      -- ruby-lsp-rails addon into a per-project composed bundle (.ruby-lsp/).
+      -- Formatting also flows through it (conform's `lsp_format = 'fallback'`),
+      -- using whatever formatter the project declares (rubocop/standardrb/...).
+      --
+      -- Base config (cmd = { 'ruby-lsp' }, filetypes ruby/eruby, root markers
+      -- Gemfile/.git) comes from nvim-lspconfig; we only add capabilities.
+      vim.lsp.config('ruby_lsp', {
+        capabilities = capabilities,
+      })
+
+      -- Required: Enable the language server
+      vim.lsp.enable 'ruby_lsp'
     end,
   },
 
@@ -818,11 +859,28 @@ require('lazy').setup({
   { -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
     config = function()
-      local filetypes = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' }
-      require('nvim-treesitter').install(filetypes)
+      -- Parser names to install.
+      -- NOTE: the ERB parser is called `embedded_template` (its Neovim
+      -- filetype is `eruby` — see the mapping + filetypes list below).
+      -- `html` + `ruby` are also what ERB injections highlight with.
+      local parsers = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'ruby', 'embedded_template' }
+      require('nvim-treesitter').install(parsers)
+
+      -- Map the ERB filetype (`eruby`) to the `embedded_template` parser so
+      -- vim.treesitter.start() can resolve it (there's no default mapping).
+      vim.treesitter.language.register('embedded_template', { 'eruby' })
+
+      -- Filetypes to start treesitter highlighting on.
+      -- NOTE: this list uses FILETYPES (`eruby`), while the list above uses
+      -- PARSER names (`embedded_template`) — they differ only for ERB.
+      local filetypes = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'ruby', 'eruby' }
       vim.api.nvim_create_autocmd('FileType', {
         pattern = filetypes,
-        callback = function() vim.treesitter.start() end,
+        -- pcall: on a fresh machine, parsers install/compile asynchronously,
+        -- so a file opened during that first minute would otherwise throw
+        -- "Parser could not be created". Silently skip; highlighting kicks in
+        -- on the next open once the parser is compiled.
+        callback = function() pcall(vim.treesitter.start) end,
       })
     end,
   },

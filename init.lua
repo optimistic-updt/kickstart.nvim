@@ -75,7 +75,10 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+-- (SpaceMono Nerd Font — installed by dotfiles/.macos, selected via the
+-- kevin-main iTerm2 dynamic profile. Enables nvim-web-devicons + icons in
+-- Telescope, which-key, oil.nvim, etc.)
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.o`
